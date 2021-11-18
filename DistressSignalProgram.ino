@@ -70,13 +70,16 @@ FisherMesh mesh(NODE_ADDRESS, LORA_FREQUENCY);
         3. ID, GPS and distance
  */
 
-bool inDistress = true;
+bool inDistress = false;
 AlertLevel currentAlertLevel = ALERT_GENERAL; // Hard coded for testing purposes
 unsigned long timeLastSignalSent = 0;
+DistressResponse lastResponse;
+bool receivedResponse = false;
 
 void setup() {
   Serial.begin(115200);
   setupOled();
+  setupGps();
   if (!mesh.init()) {
     Serial.println(F("Failed to initialize mesh network"));
     oled.println(F("Failed to initialize mesh network"));
@@ -119,12 +122,14 @@ void loop() {
       {
         gpsLat = gps.location.lat();
         gpsLong = gps.location.lng();
+        Serial.printf("Valid: GPS (%f, %f)\n", gps.location.lat(), gps.location.lng());
       }
       else
       {
         // Scenario when gps has no valid gps data
         gpsLat = 999.0;
         gpsLong = 999.0;
+        Serial.printf("Invalid: GPS (%f, %f)\n", gps.location.lat(), gps.location.lng());
       }
 
       AlertLevel alertlevel = currentAlertLevel;
@@ -140,15 +145,27 @@ void loop() {
     // While we are also in distress, listen for any distress reponse for us
     if (mesh.listenForDistressResponse())
     {
-      DistressResponse response = mesh.getResponse();
+      Serial.println("Received response");
       // Assumption: Only data of last responder will appear
-      oled.setCursor(0, 30);
-      oled.println();
-      oled.printf("Responder Number: %d\n", response.address);
-      oled.printf("GPS Lat: %f\n", response.address);
-      oled.printf("GPS Long: %f\n", response.address);
+      lastResponse = mesh.getResponse();
+      receivedResponse = true;
+      
+      Serial.printf("Responder Number: %u\n", lastResponse.address);
+      Serial.printf("GPS Lat: %f\n", lastResponse.address);
+      Serial.printf("GPS Long: %f\n", lastResponse.address);
     }
-    
+
+    // Continuously print out response if there is one received
+    if (receivedResponse)
+    {
+      oled.setCursor(0, 30);
+      oled.print("Responder Number: ");
+      oled.print(lastResponse.address, DEC);
+      oled.print("\n");
+      oled.print("("); oled.print(lastResponse.gpsLat, 2); oled.print(", "); oled.print(lastResponse.gpsLong, 2); oled.println(")");           
+    }
+
+    oled.invertDisplay(true);
     oled.display();
   }
   else // not in distress
@@ -156,39 +173,41 @@ void loop() {
     // Should go back to the default menu
     // As a placeholder, I'll just show the text "Default Menu"
     oled.clearDisplay();
-    oled.setCursor(75, 28); // middle of screen tantsa
+    oled.setCursor(0, 28); // middle of screen tantsa
     oled.setTextSize(2);
-    oled.println("Default Menu");
+    oled.println("Default");
+    oled.println("Menu");
+    
+    // For debugging purposes, listen and print out any received distress signals
+    if (mesh.listenForDistressSignal())
+    {
+      DistressSignal dsignal = mesh.getDistessSignal();
+      Serial.printf("Received signal from node %u\n", dsignal.address);
+      Serial.printf("with GPS: (%f, %f)\n", dsignal.gpsLat, dsignal.gpsLong);
+      Serial.printf("Nature of emergency: %d\n", dsignal.alertLevel);
+    }
+
+    oled.invertDisplay(false);
     oled.display();
   }
 }
 
-void handleButton1Click()
-{
+void handleButton1Click() {
   inDistress = !inDistress;
 }
 
-void handleButton2Click()
-{
+void handleButton2Click() {
   sendDistressResponse();
 }
 
-// FOR TESTING PURPOSES ONLY: Send distress response 
-unsigned long lastDistressResponseTime = 0;
-unsigned long intervalBetweenDistress = 1000;
-
-void sendDistressResponse()
-{
-  unsigned long currentTime = millis();
-  if (currentTime - lastDistressResponseTime > intervalBetweenDistress) {
-    // WARNING: HARDCODED
-    // Address should be taken from a distress signal message
-    int receiver = 2;
-    
-    if (mesh.sendDistressResponse(receiver, gps.location.lat(), gps.location.lng())) {
-      Serial.println("Sent distress response");
-      lastDistressResponseTime = currentTime;
-    }
+// FOR TESTING PURPOSES ONLY: Manually send distress response 
+void sendDistressResponse() {
+  // WARNING: HARDCODED
+  // Address should be taken from a distress signal message
+  int receiver = 2;
+  
+  if (mesh.sendDistressResponse(receiver, gps.location.lat(), gps.location.lng())) {
+    Serial.println("Sent distress response");
   }
 }
 
@@ -201,6 +220,10 @@ void setupOled() {
     Serial.println(F("SSD1306 allocation failed"));
     while (true);
   }
+}
+
+void setupGps() {
+  gpsSerial.begin(9600);
 }
 
 // Updates gps with data from the module
