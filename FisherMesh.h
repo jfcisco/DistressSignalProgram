@@ -85,6 +85,11 @@ public:
   // Gets the last distress signal received (if we are listening for distress signals)
   DistressSignal getDistessSignal();
 
+  static const char* getNameOfAlertLevel()
+  {
+    
+  }
+
 private:
   uint8_t _address;
   uint8_t _buffer[RH_MESH_MAX_MESSAGE_LEN];
@@ -93,6 +98,7 @@ private:
   float _frequency;
   DistressSignal _distressSignal;
   DistressResponse _distressResponse;
+  static char* getNameOfAlertLevel(AlertLevel al);
 };
 
 // C++ implementation of the methods above
@@ -189,10 +195,10 @@ bool FisherMesh::listenForDistressSignal() {
     // (i.e. DistressResponse and DistressSignal) have a DistressHeader.
     DistressHeader *header = (DistressHeader *)_buffer;
     
-    if (len > 1 && header->msgType == DISTRESS_RESPONSE) {
+    if (len > 1 && header->msgType == DISTRESS_SIGNAL) {
       // Cast the response into the struct
-      DistressResponse *response = (DistressResponse *)header;
-      _distressResponse = *response;
+      DistressSignal *distressSignal = (DistressSignal *)header;
+      _distressSignal = *distressSignal;
     }
 
     return true;
@@ -212,10 +218,10 @@ bool FisherMesh::listenForDistressResponse() {
     // (i.e. DistressResponse and DistressSignal) have a DistressHeader.
     DistressHeader *header = (DistressHeader *)_buffer;
     
-    if (len > 1 && header->msgType == DISTRESS_SIGNAL) {
+    if (len > 1 && header->msgType == DISTRESS_RESPONSE) {
       // Cast the response into the struct
-      DistressSignal *distressSignal = (DistressSignal *)header;
-      _distressSignal = *distressSignal;
+      DistressResponse *response = (DistressResponse *)header;
+      _distressResponse = *response;
     }
 
     return true;
