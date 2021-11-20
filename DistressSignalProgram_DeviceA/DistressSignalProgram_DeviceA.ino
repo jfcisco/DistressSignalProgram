@@ -105,9 +105,9 @@ void loop() {
   if (inDistress)
   {
     // Show distress state in OLED screen
-    oled.setCursor(0, 0);
-    oled.setTextSize(1);
-    oled.println("Vessel in Distress");
+    // oled.setCursor(0, 0);
+    // oled.setTextSize(1);
+    // oled.println("Vessel in Distress");
 
     // When did we last broadcast? 
     // If more than 30 seconds passed, we can broadcast again
@@ -155,17 +155,27 @@ void loop() {
       Serial.printf("GPS Long: %f\n", lastResponse.address);
     }
 
+    // oled.invertDisplay(true);
+
+    // Display the beaming circle
+    int phase = (millis() / 1000) % 3;
+    drawBeamingCircle(phase);
+    oled.setCursor(40, 10);
+    oled.setTextSize(2);
+    oled.print("SOS");
+    oled.print(currentAlertLevel, DEC);
+
     // Continuously print out response if there is one received
     if (receivedResponse)
     {
       oled.setCursor(0, 30);
+      oled.setTextSize(1);
       oled.print("Responder Number: ");
       oled.print(lastResponse.address, DEC);
       oled.print("\n");
       oled.print("("); oled.print(lastResponse.gpsLat, 2); oled.print(", "); oled.print(lastResponse.gpsLong, 2); oled.println(")");           
     }
-
-    oled.invertDisplay(true);
+    
     oled.display();
   }
   else // not in distress
@@ -173,10 +183,11 @@ void loop() {
     // Should go back to the default menu
     // As a placeholder, I'll just show the text "Default Menu"
     oled.clearDisplay();
-    oled.setCursor(0, 28); // middle of screen tantsa
-    oled.setTextSize(2);
-    oled.println("Default");
-    oled.println("Menu");
+    oled.setCursor(0, 0); // middle of screen tantsa
+    oled.setTextSize(1);  
+    oled.println("Default Menu");
+    oled.println("Press btn 1 to go to distress signal state");
+    oled.println("Press btn 2 to send a distress response");
     
     // For debugging purposes, listen and print out any received distress signals
     if (mesh.listenForDistressSignal())
@@ -208,6 +219,26 @@ void sendDistressResponse() {
   
   if (mesh.sendDistressResponse(receiver, gps.location.lat(), gps.location.lng())) {
     Serial.println("Sent distress response");
+  }
+}
+
+// ==============
+// GUI Code
+// =============
+
+#define CIRCLE_CENTER_X 63
+#define CIRCLE_CENTER_Y 31
+
+void drawBeamingCircle(int phase)
+{
+  switch (phase)
+  {
+    case 2:
+      oled.fillCircle(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, 65, WHITE);
+      oled.fillCircle(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, 55, BLACK);
+    case 1:
+      oled.fillCircle(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, 45, WHITE);
+      oled.fillCircle(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, 35, BLACK);
   }
 }
 
